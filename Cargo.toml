@@ -1,0 +1,19 @@
+[package]
+name = "one-of-many-proofs"
+version = "0.1.0"
+authors = ["cargodog <cargodog@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+curve25519-dalek = { version = "2", default-features = false, features = ["simd_backend", "nightly", "serde", "alloc"] }
+rand = "0.7"
+sha3 = { version = "0.8", default-features = false }
+merlin = { version = "2", default-features = false }
+polynomials = "0.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "proof_benchmarks"
+harness = false
