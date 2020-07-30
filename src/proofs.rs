@@ -734,6 +734,36 @@ mod tests {
     }
 
     #[test]
+    fn gens_set_size() {
+        // Not a lot can go wrong here, but test some corner cases to catch
+        // potential issues between architectures
+
+        // 8 bit corners
+        let gens = ProofGens::new(7).unwrap();
+        assert_eq!(gens.max_set_size(), 128);
+        let gens = ProofGens::new(8).unwrap();
+        assert_eq!(gens.max_set_size(), 256);
+        let gens = ProofGens::new(9).unwrap();
+        assert_eq!(gens.max_set_size(), 512);
+
+        // 16 bit corners
+        let gens = ProofGens::new(15).unwrap();
+        assert_eq!(gens.max_set_size(), 32768);
+        let gens = ProofGens::new(16).unwrap();
+        assert_eq!(gens.max_set_size(), 65536);
+        let gens = ProofGens::new(17).unwrap();
+        assert_eq!(gens.max_set_size(), 131072);
+
+        // 32 bit corners
+        let gens = ProofGens::new(31).unwrap();
+        assert_eq!(gens.max_set_size(), 2147483648);
+        let gens = ProofGens::new(32).unwrap();
+        assert_eq!(gens.max_set_size(), 4294967296);
+        let gens = ProofGens::new(33).unwrap();
+        assert_eq!(gens.max_set_size(), 8589934592);
+    }
+
+    #[test]
     fn bit_commitments() {
         // Set up proof generators
         let gens = ProofGens::new(5).unwrap();
