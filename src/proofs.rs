@@ -209,7 +209,6 @@ impl ProofGens {
     /// Verify a bit commitment proof.
     ///
     /// ```
-    /// extern crate rand;
     /// use rand::rngs::OsRng; // You should use a more secure RNG
     /// use one_of_many_proofs::proofs::ProofGens;
     /// use curve25519_dalek::scalar::Scalar;
@@ -221,10 +220,9 @@ impl ProofGens {
     /// let a_j = (0..gens.n_bits)
     ///     .map(|_| Scalar::random(&mut OsRng))
     ///     .collect::<Vec<Scalar>>();
-    /// let (B, proof, x) = gens.commit_bits(&mut t, l, &a_j).unwrap();
+    /// let (B, proof, x) = gens.commit_bits(&mut t.clone(), l, &a_j).unwrap();
     ///
-    /// let mut t = Transcript::new(b"doctest example");
-    /// assert!(gens.verify_bits(&mut t, &B, &proof).is_ok());
+    /// assert!(gens.verify_bits(&mut t.clone(), &B, &proof).is_ok());
     /// ```
     pub fn verify_bits(
         &self,
@@ -286,7 +284,7 @@ impl ProofGens {
 
         // Verify relation R1
         if x * B + proof.A != f_j_i.iter().flatten().commit(&self, &proof.z_A)? {
-            return Err(ProofError::VerificationError);
+            return Err(ProofError::VerificationFailed);
         }
         let r1 = f_j_i
             .iter()
@@ -294,7 +292,7 @@ impl ProofGens {
             .flatten()
             .commit(&self, &proof.z_C)?;
         if x * proof.C + proof.D != r1 {
-            return Err(ProofError::VerificationError);
+            return Err(ProofError::VerificationFailed);
         }
         Ok(x)
     }
@@ -313,7 +311,6 @@ pub trait OneOfManyProofs {
     //! commitments. Proofs for commitments are demonstrated further below.
     //!
     //! ```
-    //! extern crate rand;
     //! use rand::rngs::OsRng; // You should use a more secure RNG
     //! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
     //! use curve25519_dalek::scalar::Scalar;
@@ -337,13 +334,12 @@ pub trait OneOfManyProofs {
     //!
     //! // Compute a `OneOfMany` membership proof for this commitment
     //! let mut t = Transcript::new(b"OneOfMany-Test");
-    //! let proof = set.iter().prove(&gens, &mut t, l, &r).unwrap();
+    //! let proof = set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap();
     //!
     //! // Verify this membership proof, without any knowledge of `l` or `r`.
-    //! let mut t = Transcript::new(b"OneOfMany-Test");
     //! assert!(set
     //!     .iter()
-    //!     .verify(&gens, &mut t, &proof)
+    //!     .verify(&gens, &mut t.clone(), &proof)
     //!     .is_ok());
     //! ```
     //!
@@ -367,7 +363,6 @@ pub trait OneOfManyProofs {
     //! this value must be supplied instead of `r`, to compute the proof.
     //!
     //! ```
-    //! extern crate rand;
     //! use rand::rngs::OsRng; // You should use a more secure RNG
     //! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
     //! use curve25519_dalek::scalar::Scalar;
@@ -395,13 +390,12 @@ pub trait OneOfManyProofs {
     //!
     //! // Compute a `OneOfMany` membership proof for this commitment
     //! let mut t = Transcript::new(b"OneOfMany-Test");
-    //! let proof = set.iter().prove_with_offset(&gens, &mut t, l, &(r - r_new), Some(&C_new)).unwrap();
+    //! let proof = set.iter().prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new)).unwrap();
     //!
     //! // Verify this membership proof, without any knowledge of `l` or `r`.
-    //! let mut t = Transcript::new(b"OneOfMany-Test");
     //! assert!(set
     //!     .iter()
-    //!     .verify_with_offset(&gens, &mut t, &proof, Some(&C_new))
+    //!     .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
     //!     .is_ok());
     //! ```
 
@@ -643,10 +637,10 @@ where
             })
             .sum::<RistrettoPoint>();
         if C.is_identity() || E.is_identity() || G.is_identity() || O.is_identity() {
-            return Err(ProofError::VerificationError);
+            return Err(ProofError::VerificationFailed);
         }
         if C != E + G + O {
-            return Err(ProofError::VerificationError);
+            return Err(ProofError::VerificationFailed);
         }
 
         Ok(())
@@ -719,3 +713,271 @@ fn delta(a: usize, b: usize) -> usize {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::errors::*;
+    use crate::proofs::{OneOfManyProofs, ProofGens};
+    use curve25519_dalek::ristretto::RistrettoPoint;
+    use curve25519_dalek::scalar::Scalar;
+    use merlin::Transcript;
+    use rand::rngs::OsRng; // You should use a more secure RNG
+
+    #[test]
+    fn bit_commitments() {
+        // Set up proof generators
+        let gens = ProofGens::new(5).unwrap();
+
+        // Create the prover's commitment to zero
+        let l: usize = 3; // The prover's commitment will be third in the set
+        let t = Transcript::new(b"OneOfMany-Test");
+
+        let a_j = (0..gens.n_bits)
+            .map(|_| Scalar::random(&mut OsRng))
+            .collect::<Vec<Scalar>>();
+
+        // Compute a bit commitment and its proof
+        let (B, proof, _) = gens.commit_bits(&mut t.clone(), l, &a_j).unwrap();
+        assert!(gens.verify_bits(&mut t.clone(), &B, &proof).is_ok());
+
+        // Check error if index out of bounds
+        assert_eq!(
+            gens.commit_bits(&mut t.clone(), gens.max_set_size(), &a_j)
+                .unwrap_err(),
+            ProofError::IndexOutOfBounds
+        );
+    }
+
+    #[test]
+    fn prove_single() {
+        // Set up proof generators
+        let gens = ProofGens::new(5).unwrap();
+
+        // Create the prover's commitment to zero
+        let l: usize = 3; // The prover's commitment will be third in the set
+        let v = Scalar::zero();
+        let r = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let C_l = gens.commit(&v, &r).unwrap();
+
+        // Build a random set containing the prover's commitment at index `l`
+        let mut set = (1..gens.max_set_size())
+            .map(|_| RistrettoPoint::random(&mut OsRng))
+            .collect::<Vec<RistrettoPoint>>();
+        set.insert(l, C_l);
+        let t = Transcript::new(b"OneOfMany-Test");
+
+        // Compute a `OneOfMany` membership proof for this commitment
+        let proof = set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap();
+        assert!(set.iter().verify(&gens, &mut t.clone(), &proof).is_ok());
+
+        // Check error if index out of bounds
+        assert_eq!(
+            set.iter()
+                .prove(&gens, &mut t.clone(), gens.max_set_size(), &r)
+                .unwrap_err(),
+            ProofError::IndexOutOfBounds
+        );
+
+        // Prove should fail if set too small or too large
+        let removed = set.pop().unwrap();
+        assert_eq!(
+            set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap_err(),
+            ProofError::SetIsTooSmall
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert!(set.iter().prove(&gens, &mut t.clone(), l, &r).is_ok()); // Ok!
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap_err(),
+            ProofError::SetIsTooLarge
+        );
+
+        // Return set to original state
+        set.pop();
+        set.pop();
+        set.push(removed);
+
+        // Verify should fail if set has been modified
+        let removed = set.pop().unwrap();
+        assert_eq!(
+            set.iter()
+                .verify(&gens, &mut t.clone(), &proof)
+                .unwrap_err(),
+            ProofError::SetIsTooSmall
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter()
+                .verify(&gens, &mut t.clone(), &proof)
+                .unwrap_err(),
+            ProofError::VerificationFailed
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter()
+                .verify(&gens, &mut t.clone(), &proof)
+                .unwrap_err(),
+            ProofError::SetIsTooLarge
+        );
+
+        // Return set to original state
+        set.pop();
+        set.pop();
+        set.push(removed);
+    }
+
+    #[test]
+    fn prove_single_with_offset() {
+        // Set up proof generators
+        let gens = ProofGens::new(5).unwrap();
+
+        // Create the prover's commitment to zero
+        let l: usize = 3; // The prover's commitment will be third in the set
+        let v = Scalar::zero();
+        let r = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let C_l = gens.commit(&v, &r).unwrap();
+
+        // Build a random set containing the prover's commitment at index `l`
+        let mut set = (1..gens.max_set_size())
+            .map(|_| RistrettoPoint::random(&mut OsRng))
+            .collect::<Vec<RistrettoPoint>>();
+        set.insert(l, C_l);
+
+        let t = Transcript::new(b"OneOfMany-Test");
+
+        // First test with no offest
+        let proof = set
+            .iter()
+            .prove_with_offset(&gens, &mut t.clone(), l, &r, None)
+            .unwrap();
+        assert!(set
+            .iter()
+            .verify_with_offset(&gens, &mut t.clone(), &proof, None)
+            .is_ok());
+
+        // Now replace C_l with a committment to a non-zero value
+        let v = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let C_l = gens.commit(&v, &r).unwrap();
+        set[l] = C_l;
+
+        // Compute new commitment, to same value as `C_l`
+        let r_new = Scalar::random(&mut OsRng);
+        let C_new = gens.commit(&v, &r_new).unwrap(); // New commitment to same value
+
+        // Now test with the valid offset and commitment to non-zero
+        let proof = set
+            .iter()
+            .prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new))
+            .unwrap();
+        assert!(set
+            .iter()
+            .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
+            .is_ok());
+
+        // Now test with the incorrect offset
+        assert_eq!(
+            set.iter()
+                .verify_with_offset(
+                    &gens,
+                    &mut t.clone(),
+                    &proof,
+                    Some(&RistrettoPoint::random(&mut OsRng))
+                )
+                .unwrap_err(),
+            ProofError::VerificationFailed
+        );
+
+        // Check error if index out of bounds
+        assert_eq!(
+            set.iter()
+                .prove_with_offset(&gens, &mut t.clone(), gens.max_set_size(), &r, Some(&C_new))
+                .unwrap_err(),
+            ProofError::IndexOutOfBounds
+        );
+
+        // Prove should fail if set too small or too large
+        let removed = set.pop().unwrap();
+        assert_eq!(
+            set.iter()
+                .prove_with_offset(&gens, &mut t.clone(), l, &r, Some(&C_new))
+                .unwrap_err(),
+            ProofError::SetIsTooSmall
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert!(set
+            .iter()
+            .prove_with_offset(&gens, &mut t.clone(), l, &r, Some(&C_new))
+            .is_ok()); // Ok!
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter()
+                .prove_with_offset(&gens, &mut t.clone(), l, &r, Some(&C_new))
+                .unwrap_err(),
+            ProofError::SetIsTooLarge
+        );
+
+        // Return set to original state
+        set.pop();
+        set.pop();
+        set.push(removed);
+
+        // Verify should fail if set has been modified
+        let removed = set.pop().unwrap();
+        assert_eq!(
+            set.iter()
+                .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
+                .unwrap_err(),
+            ProofError::SetIsTooSmall
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter()
+                .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
+                .unwrap_err(),
+            ProofError::VerificationFailed
+        );
+        set.push(RistrettoPoint::random(&mut OsRng));
+        assert_eq!(
+            set.iter()
+                .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
+                .unwrap_err(),
+            ProofError::SetIsTooLarge
+        );
+
+        // Return set to original state
+        set.pop();
+        set.pop();
+        set.push(removed);
+    }
+
+    #[test]
+    fn prove_batch() {
+        // Set up proof generators
+        let gens = ProofGens::new(5).unwrap();
+
+        // Create the prover's commitment to zero
+        let l: usize = 3; // The prover's commitment will be third in the set
+        let v = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let r = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let C_l = gens.commit(&v, &r).unwrap();
+
+        // Compute new commitment, to same value as `C_l`
+        let r_new = Scalar::random(&mut OsRng);
+        let C_new = gens.commit(&v, &r_new).unwrap(); // New commitment to same value
+
+        // Build a random set containing the prover's commitment at index `l`
+        let mut set = (1..gens.max_set_size())
+            .map(|_| RistrettoPoint::random(&mut OsRng))
+            .collect::<Vec<RistrettoPoint>>();
+        set.insert(l, C_l);
+
+        let t = Transcript::new(b"OneOfMany-Test");
+        let mut proofs = Vec::new();
+        let mut offsets = Vec::new();
+
+        for _ in 0..10 {
+            proofs.push(set.iter().prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new)).unwrap());
+            offsets.push(Some(&C_new));
+        }
+        assert!(set.iter().verify_batch_with_offsets(&gens, &mut t.clone(), &proofs[..], &offsets[..]).is_ok());
+    }
+}

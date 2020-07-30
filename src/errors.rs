@@ -2,7 +2,7 @@ use curve25519_dalek::scalar::Scalar;
 
 pub type ProofResult<T> = core::result::Result<T, ProofError>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ProofError {
     InvalidProofSize,
     InvalidScalar(Scalar),
@@ -11,5 +11,5 @@ pub enum ProofError {
     SetIsTooLarge,
     SetIsTooSmall,
     Unimplemented,
-    VerificationError,
+    VerificationFailed,
 }
