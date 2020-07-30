@@ -636,7 +636,7 @@ where
                     .sum::<Scalar>()
             })
             .sum::<RistrettoPoint>();
-        if C.is_identity() || E.is_identity() || G.is_identity() || O.is_identity() {
+        if C.is_identity() || E.is_identity() || G.is_identity() {
             return Err(ProofError::VerificationFailed);
         }
         if C != E + G + O {
