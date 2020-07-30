@@ -1,27 +1,23 @@
 #![allow(non_snake_case)]
 use crate::errors::{ProofError, ProofResult};
 use crate::transcript::TranscriptProtocol;
-
 use core::iter::{self, Iterator};
 use core::ops::Mul;
 use core::slice;
-
 use curve25519_dalek::constants;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
-
 use merlin::Transcript;
-
 use polynomials::Polynomial;
-
+use serde::{Deserialize, Serialize};
 use sha3::Sha3_512;
 
 /// A collection of generator points that can be used to compute various proofs
 /// in this module. To create an instance of [`ProofGens`] it is recommended to
 /// call ProofGens::new(`n`), where `n` is the number of bits to be used in
 /// proofs and verifications.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofGens {
     pub n_bits: usize,
     G: RistrettoPoint,
@@ -31,7 +27,7 @@ pub struct ProofGens {
 /// A bit commitment proof. This is used as part of a [`OneOfManyProof`] and
 /// not meant for use on its own. A zero knowledge proof that the prover knows
 /// the openings of commitments to a sequence of bits.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BitProof {
     A: RistrettoPoint,
     C: RistrettoPoint,
@@ -46,7 +42,7 @@ pub struct BitProof {
 /// commitments, and the opening of that commitment,
 /// without revealing any information about the commitment or its location
 /// within the set.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OneOfManyProof {
     B: RistrettoPoint,
     bit_proof: BitProof,
@@ -726,7 +722,7 @@ fn delta(a: usize, b: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use crate::errors::*;
-    use crate::proofs::{OneOfManyProofs, ProofGens};
+    use crate::proofs::*;
     use curve25519_dalek::ristretto::RistrettoPoint;
     use curve25519_dalek::scalar::Scalar;
     use merlin::Transcript;
@@ -1049,6 +1045,65 @@ mod tests {
         for _ in 0..10 {
             proofs.push(set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap());
         }
+        assert!(set
+            .iter()
+            .verify_batch(&gens, &mut t.clone(), &proofs)
+            .is_ok());
+    }
+
+    #[test]
+    fn serde() {
+        // Set up proof generators
+        let gens = ProofGens::new(5).unwrap();
+
+        // Create the prover's commitment to zero
+        let l: usize = 3; // The prover's commitment will be third in the set
+        let v = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let r = Scalar::random(&mut OsRng); // You should use a more secure RNG
+        let C_l = gens.commit(&v, &r).unwrap();
+
+        // Compute new commitment, to same value as `C_l`
+        let r_new = Scalar::random(&mut OsRng);
+        let C_new = gens.commit(&v, &r_new).unwrap(); // New commitment to same value
+
+        // Build a random set containing the prover's commitment at index `l`
+        let mut set = (1..gens.max_set_size())
+            .map(|_| RistrettoPoint::random(&mut OsRng))
+            .collect::<Vec<RistrettoPoint>>();
+        set.insert(l, C_l);
+
+        let t = Transcript::new(b"OneOfMany-Test");
+
+        // Verify batch with offsets
+        let mut proofs = Vec::new();
+        let mut offsets = Vec::new();
+        for _ in 0..10 {
+            proofs.push(
+                set.iter()
+                    .prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new))
+                    .unwrap(),
+            );
+            offsets.push(Some(&C_new));
+        }
+        let serialized = serde_cbor::to_vec(&proofs).unwrap();
+        let proofs: Vec<OneOfManyProof> = serde_cbor::from_slice(&serialized[..]).unwrap();
+        assert!(set
+            .iter()
+            .verify_batch_with_offsets(&gens, &mut t.clone(), &proofs, &offsets)
+            .is_ok());
+
+        // Now replace C_l with a committment to zero
+        let v = Scalar::zero();
+        let C_l = gens.commit(&v, &r).unwrap();
+        set[l] = C_l;
+
+        // Now verify batch without offsets
+        let mut proofs = Vec::new();
+        for _ in 0..10 {
+            proofs.push(set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap());
+        }
+        let serialized = serde_cbor::to_vec(&proofs).unwrap();
+        let proofs: Vec<OneOfManyProof> = serde_cbor::from_slice(&serialized[..]).unwrap();
         assert!(set
             .iter()
             .verify_batch(&gens, &mut t.clone(), &proofs)
