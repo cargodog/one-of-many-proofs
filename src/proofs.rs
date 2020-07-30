@@ -723,6 +723,17 @@ mod tests {
     use rand::rngs::OsRng; // You should use a more secure RNG
 
     #[test]
+    fn new_generators() {
+        assert!(ProofGens::new(5).is_ok());
+        assert_eq!(ProofGens::new(0).unwrap_err(), ProofError::SetIsTooSmall);
+        assert_eq!(ProofGens::new(1).unwrap_err(), ProofError::SetIsTooSmall);
+        assert_eq!(
+            ProofGens::new(0xffffffff).unwrap_err(),
+            ProofError::SetIsTooLarge
+        );
+    }
+
+    #[test]
     fn bit_commitments() {
         // Set up proof generators
         let gens = ProofGens::new(5).unwrap();
