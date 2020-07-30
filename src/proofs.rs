@@ -454,6 +454,16 @@ pub trait OneOfManyProofs {
     }
 
     /// Batch verification of membership proofs
+    fn verify_batch(
+        &self,
+        gens: &ProofGens,
+        transcript: &mut Transcript,
+        proofs: &[OneOfManyProof],
+    ) -> ProofResult<()> {
+        self.verify_batch_with_offsets(gens, transcript, proofs, &vec![None; proofs.len()])
+    }
+
+    /// Batch verification of membership proofs
     fn verify_batch_with_offsets(
         &self,
         gens: &ProofGens,
@@ -1012,13 +1022,36 @@ mod tests {
         set.insert(l, C_l);
 
         let t = Transcript::new(b"OneOfMany-Test");
+
+        // Verify batch with offsets
         let mut proofs = Vec::new();
         let mut offsets = Vec::new();
-
         for _ in 0..10 {
-            proofs.push(set.iter().prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new)).unwrap());
+            proofs.push(
+                set.iter()
+                    .prove_with_offset(&gens, &mut t.clone(), l, &(r - r_new), Some(&C_new))
+                    .unwrap(),
+            );
             offsets.push(Some(&C_new));
         }
-        assert!(set.iter().verify_batch_with_offsets(&gens, &mut t.clone(), &proofs[..], &offsets[..]).is_ok());
+        assert!(set
+            .iter()
+            .verify_batch_with_offsets(&gens, &mut t.clone(), &proofs, &offsets)
+            .is_ok());
+
+        // Now replace C_l with a committment to zero
+        let v = Scalar::zero();
+        let C_l = gens.commit(&v, &r).unwrap();
+        set[l] = C_l;
+
+        // Now verify batch without offsets
+        let mut proofs = Vec::new();
+        for _ in 0..10 {
+            proofs.push(set.iter().prove(&gens, &mut t.clone(), l, &r).unwrap());
+        }
+        assert!(set
+            .iter()
+            .verify_batch(&gens, &mut t.clone(), &proofs)
+            .is_ok());
     }
 }
