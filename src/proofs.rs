@@ -13,6 +13,12 @@ use polynomials::Polynomial;
 use serde::{Deserialize, Serialize};
 use sha3::Sha3_512;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
+#[cfg(feature = "std")]
+use std::vec::Vec;
+
 /// A collection of generator points that can be used to compute various proofs
 /// in this module. To create an instance of [`ProofGens`] it is recommended to
 /// call ProofGens::new(`n`), where `n` is the number of bits to be used in

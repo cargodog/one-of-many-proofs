@@ -96,6 +96,7 @@
 //! * [One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin](https://eprint.iacr.org/2014/764)
 //! * [Short Accountable Ring Signatures Based on DDH](https://eprint.iacr.org/2015/643)
 
+#![no_std]
 #![feature(test)]
 
 //-----------------------------------------------------------------------------
@@ -104,6 +105,14 @@
 extern crate curve25519_dalek;
 extern crate polynomials;
 extern crate sha3;
+
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
 
 //-----------------------------------------------------------------------------
 // Public modules
