@@ -1,5 +1,5 @@
 //! Zero knowledge membership proofs based on the
-//! [One-out-of-Many](https://eprint.iacr.org/2014/764.pdf) proof scheme.
+//! [One-out-of-Many](https://eprint.iacr.org/2014/764) proof scheme.
 //!
 //! This membership proofs allow you to prove knowledge of the opening of a
 //! pedersen commitment, within a set of pedersen commitments, without
@@ -91,6 +91,10 @@
 //! ```bash
 //! cargo bench
 //! ```
+//!
+//! # References
+//! * [One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin](https://eprint.iacr.org/2014/764)
+//! * [Short Accountable Ring Signatures Based on DDH](https://eprint.iacr.org/2015/643)
 
 #![feature(test)]
 
