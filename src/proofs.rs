@@ -55,8 +55,7 @@ impl ProofGens {
     /// support proof and verification over an `n_bit` sized set.
     ///
     /// ```
-    /// use one_of_many_proofs::proofs::ProofGens;
-    ///
+    /// # use one_of_many_proofs::proofs::ProofGens;
     /// // Support 10 bit membership proofs
     /// let gens = ProofGens::new(10);
     /// ```
@@ -117,6 +116,26 @@ impl ProofGens {
     ///
     /// This function returns the bit commitment, `B`, its assosciated
     /// [`BitProof`], and the challenge scalar `x`.
+    ///
+    /// ```
+    /// # use rand::rngs::OsRng; // You should use a more secure RNG
+    /// # use one_of_many_proofs::proofs::ProofGens;
+    /// # use curve25519_dalek::scalar::Scalar;
+    /// # use merlin::Transcript;
+    /// // Compute the generators necessary for 5 bit proofs
+    /// let gens = ProofGens::new(5).unwrap();
+    /// let l = 7; // Some index within the range 0 <= `l` <= 2^5
+    ///
+    /// // The proof requires us to provide random noise values. For secure
+    /// // applications, be sure to use a more secure RNG.
+    /// let a_j = (0..gens.n_bits)
+    ///     .map(|_| Scalar::random(&mut OsRng))
+    ///     .collect::<Vec<Scalar>>();
+    ///
+    /// // Create a new transcript and compute the bit commitment and its proof
+    /// let mut t = Transcript::new(b"doctest example");
+    /// let (B, proof, x) = gens.commit_bits(&mut t, l, &a_j).unwrap();
+    /// ```
     pub fn commit_bits(
         &self,
         transcript: &mut Transcript,
@@ -205,20 +224,20 @@ impl ProofGens {
     /// Verify a bit commitment proof.
     ///
     /// ```
-    /// use rand::rngs::OsRng; // You should use a more secure RNG
-    /// use one_of_many_proofs::proofs::ProofGens;
-    /// use curve25519_dalek::scalar::Scalar;
-    /// use merlin::Transcript;
-    ///
-    /// let gens = ProofGens::new(5).unwrap(); // Support 5 bit proofs
-    /// let l = 7; // Some index within the range 0 <= `l` <= 2^5
+    /// # use rand::rngs::OsRng; // You should use a more secure RNG
+    /// # use one_of_many_proofs::proofs::ProofGens;
+    /// # use curve25519_dalek::scalar::Scalar;
+    /// # use merlin::Transcript;
+    /// # let gens = ProofGens::new(5).unwrap();
+    /// # let l = 7; // Some index within the range 0 <= `l` <= 2^5
+    /// # let a_j = (0..gens.n_bits)
+    /// #    .map(|_| Scalar::random(&mut OsRng))
+    /// #    .collect::<Vec<Scalar>>();
+    /// # let mut t = Transcript::new(b"doctest example");
+    /// # let (B, proof, _) = gens.commit_bits(&mut t, l, &a_j).unwrap();
+    /// // Create new transcript and verify a bit commitment against its proof
     /// let mut t = Transcript::new(b"doctest example");
-    /// let a_j = (0..gens.n_bits)
-    ///     .map(|_| Scalar::random(&mut OsRng))
-    ///     .collect::<Vec<Scalar>>();
-    /// let (B, proof, x) = gens.commit_bits(&mut t.clone(), l, &a_j).unwrap();
-    ///
-    /// assert!(gens.verify_bits(&mut t.clone(), &B, &proof).is_ok());
+    /// assert!(gens.verify_bits(&mut t, &B, &proof).is_ok());
     /// ```
     pub fn verify_bits(
         &self,
@@ -307,12 +326,12 @@ pub trait OneOfManyProofs {
     //! commitments. Proofs for commitments are demonstrated further below.
     //!
     //! ```
-    //! use rand::rngs::OsRng; // You should use a more secure RNG
-    //! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
-    //! use curve25519_dalek::scalar::Scalar;
-    //! use curve25519_dalek::ristretto::RistrettoPoint;
-    //! use merlin::Transcript;
-    //!
+    //! # use rand::rngs::OsRng; // You should use a more secure RNG
+    //! # use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
+    //! # use curve25519_dalek::scalar::Scalar;
+    //! # use curve25519_dalek::ristretto::RistrettoPoint;
+    //! # use merlin::Transcript;
+    //! #
     //! // Set up proof generators
     //! let gens = ProofGens::new(5).unwrap();
     //!
@@ -359,12 +378,12 @@ pub trait OneOfManyProofs {
     //! this value must be supplied instead of `r`, to compute the proof.
     //!
     //! ```
-    //! use rand::rngs::OsRng; // You should use a more secure RNG
-    //! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
-    //! use curve25519_dalek::scalar::Scalar;
-    //! use curve25519_dalek::ristretto::RistrettoPoint;
-    //! use merlin::Transcript;
-    //!
+    //! # use rand::rngs::OsRng; // You should use a more secure RNG
+    //! # use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
+    //! # use curve25519_dalek::scalar::Scalar;
+    //! # use curve25519_dalek::ristretto::RistrettoPoint;
+    //! # use merlin::Transcript;
+    //! #
     //! // Set up proof generators
     //! let gens = ProofGens::new(5).unwrap();
     //!

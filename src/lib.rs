@@ -8,12 +8,12 @@
 //! # Examples
 //! Prove you know a commitment to zero, `C_l`, within a set of commitments:
 //! ```
-//! use rand::rngs::OsRng; // You should use a more secure RNG
-//! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
-//! use curve25519_dalek::scalar::Scalar;
-//! use curve25519_dalek::ristretto::RistrettoPoint;
-//! use merlin::Transcript;
-//!
+//! # use rand::rngs::OsRng; // You should use a more secure RNG
+//! # use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
+//! # use curve25519_dalek::scalar::Scalar;
+//! # use curve25519_dalek::ristretto::RistrettoPoint;
+//! # use merlin::Transcript;
+//! #
 //! // Set up proof generators
 //! let gens = ProofGens::new(5).unwrap();
 //!
@@ -42,12 +42,12 @@
 //! Prove you know a commitment that opens to any value (possibly non-zero),
 //! within a set of commitments:
 //! ```
-//! use rand::rngs::OsRng; // You should use a more secure RNG
-//! use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
-//! use curve25519_dalek::scalar::Scalar;
-//! use curve25519_dalek::ristretto::RistrettoPoint;
-//! use merlin::Transcript;
-//!
+//! # use rand::rngs::OsRng; // You should use a more secure RNG
+//! # use one_of_many_proofs::proofs::{ProofGens, OneOfManyProofs};
+//! # use curve25519_dalek::scalar::Scalar;
+//! # use curve25519_dalek::ristretto::RistrettoPoint;
+//! # use merlin::Transcript;
+//! #
 //! // Set up proof generators
 //! let gens = ProofGens::new(5).unwrap();
 //!
@@ -83,12 +83,12 @@
 //! [curve25519-dalek](https://docs.rs/curve25519-dalek) for elliptic curve operations on the
 //! ristretto255 curve group. These operations can be optimized by compiling to use the SIMD
 //! backend. To do set this compile option, set the following environment variable:
-//! ```
+//! ```bash
 //! export RUSTFLAGS="-C target_cpu=native"
 //! ```
 //!
 //! Benchmarks are run using [criterion.rs](https://docs.rs/criterion):
-//! ```
+//! ```bash
 //! cargo bench
 //! ```
 
