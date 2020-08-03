@@ -77,6 +77,20 @@
 //!     .verify_with_offset(&gens, &mut t.clone(), &proof, Some(&C_new))
 //!     .is_ok());
 //! ```
+//!
+//! # Perfomance
+//! The proof(s) provided by this crate depend heavily on the
+//! [curve25519-dalek](https://docs.rs/curve25519-dalek) for elliptic curve operations on the
+//! ristretto255 curve group. These operations can be optimized by compiling to use the SIMD
+//! backend. To do set this compile option, set the following environment variable:
+//! ```
+//! export RUSTFLAGS="-C target_cpu=native"
+//! ```
+//!
+//! Benchmarks are run using [criterion.rs](https://docs.rs/criterion):
+//! ```
+//! cargo bench
+//! ```
 
 #![feature(test)]
 
