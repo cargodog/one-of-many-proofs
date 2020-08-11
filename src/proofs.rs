@@ -603,7 +603,7 @@ where
                         f0_j.iter()
                             .zip(p.bit_proof.f_j.iter())
                             .enumerate()
-                            .map(|(j, (&f0, &f1))| if bit(i, j) == 0 { f0 } else { f1 })
+                            .map(|(j, (f0, f1))| if bit(i, j) == 0 { f0 } else { f1 })
                             .product::<Scalar>()
                     })
                     .sum::<Scalar>()
