@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 use crate::errors::{ProofError, ProofResult};
+use crate::gray_code::gray_code;
 use crate::transcript::TranscriptProtocol;
 use core::iter::{self, Iterator};
 use core::ops::Mul;
@@ -532,7 +533,7 @@ where
         self.clone()
             .map(|&C_i| if let Some(O) = offset { C_i - O } else { C_i })
             .for_each(|C_i| {
-                let p_i = compute_p_i(i, l, &a_j_i);
+                let p_i = compute_p_i(gray_code(i), gray_code(l), &a_j_i);
                 p_i.iter().enumerate().for_each(|(k, p)| {
                     G_k[k] += p * C_i;
                 });
@@ -547,7 +548,8 @@ where
             transcript.validate_and_append_point(b"G_k", &G_k[k].compress())?;
         }
 
-        let (B, bit_proof, x) = gens.commit_bits(&mut transcript.clone(), l, &a_j_i[0])?;
+        let (B, bit_proof, x) =
+            gens.commit_bits(&mut transcript.clone(), gray_code(l), &a_j_i[0])?;
 
         let z = r * scalar_exp(x, gens.n_bits) - Polynomial::from(rho_k).eval(x).unwrap();
 
@@ -603,7 +605,7 @@ where
                         f0_j.iter()
                             .zip(p.bit_proof.f_j.iter())
                             .enumerate()
-                            .map(|(j, (f0, f1))| if bit(i, j) == 0 { f0 } else { f1 })
+                            .map(|(j, (f0, f1))| if bit(gray_code(i), j) == 0 { f0 } else { f1 })
                             .product::<Scalar>()
                     })
                     .sum::<Scalar>()
@@ -636,7 +638,7 @@ where
                         f0_j.iter()
                             .zip(p.bit_proof.f_j.iter())
                             .enumerate()
-                            .map(|(j, (&f0, &f1))| if bit(i, j) == 0 { f0 } else { f1 })
+                            .map(|(j, (&f0, &f1))| if bit(gray_code(i), j) == 0 { f0 } else { f1 })
                             .product::<Scalar>()
                     })
                     .sum::<Scalar>()
