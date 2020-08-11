@@ -39,7 +39,7 @@ pub struct BitProof {
     A: RistrettoPoint,
     C: RistrettoPoint,
     D: RistrettoPoint,
-    f_j: Vec<Scalar>,
+    f1_j: Vec<Scalar>,
     z_A: Scalar,
     z_C: Scalar,
 }
@@ -200,7 +200,7 @@ impl ProofGens {
 
         let x = transcript.challenge_scalar(b"bit-proof-challenge");
 
-        let f_j = a_j_i[1]
+        let f1_j = a_j_i[1]
             .iter()
             .zip(b_j_i[1].iter())
             .map(|(a, b)| b * x + a)
@@ -208,8 +208,8 @@ impl ProofGens {
         let z_A = r_B * x + r_A;
         let z_C = r_C * x + r_D;
 
-        for f in &f_j {
-            transcript.append_scalar(b"f_j", f);
+        for f in &f1_j {
+            transcript.append_scalar(b"f1_j", f);
         }
         transcript.append_scalar(b"z_A", &z_A);
         transcript.append_scalar(b"z_C", &z_C);
@@ -220,7 +220,7 @@ impl ProofGens {
                 A,
                 C,
                 D,
-                f_j,
+                f1_j,
                 z_A,
                 z_C,
             },
@@ -261,19 +261,19 @@ impl ProofGens {
 
         let x = transcript.challenge_scalar(b"bit-proof-challenge");
 
-        for f in &proof.f_j {
-            transcript.append_scalar(b"f_j", f);
+        for f in &proof.f1_j {
+            transcript.append_scalar(b"f1_j", f);
         }
         transcript.append_scalar(b"z_A", &proof.z_A);
         transcript.append_scalar(b"z_C", &proof.z_C);
 
         // Verify proof size
-        if proof.f_j.len() != self.n_bits {
+        if proof.f1_j.len() != self.n_bits {
             return Err(ProofError::InvalidProofSize);
         }
 
         // Verify all scalars are canonical
-        for f in &proof.f_j {
+        for f in &proof.f1_j {
             if !f.is_canonical() {
                 return Err(ProofError::InvalidScalar(*f));
             }
@@ -285,9 +285,9 @@ impl ProofGens {
             return Err(ProofError::InvalidScalar(proof.z_C));
         }
 
-        // Inflate f_j_i to include reconstructed f_j_0 vector
-        let f_j_i = iter::once(proof.f_j.iter().map(|f| x - f).collect())
-            .chain(iter::once(proof.f_j.clone()))
+        // Inflate f1_j to include reconstructed f0_j vector
+        let f_j_i = iter::once(proof.f1_j.iter().map(|f| x - f).collect())
+            .chain(iter::once(proof.f1_j.clone()))
             .collect::<Vec<Vec<Scalar>>>();
 
         // Verify relation R1
@@ -585,29 +585,32 @@ where
             x_vec.push(gens.verify_bits(&mut t, &p.B, &p.bit_proof)?);
         }
 
-        let f0_j_vec: Vec<Vec<Scalar>> = proofs
+        // Batch verification strategy inspired by https://eprint.iacr.org/2019/373.pdf
+        let mut set_size: usize = 0;
+        let mut coeff_iters: Vec<SetCoefficientIterator> = proofs
             .iter()
             .zip(x_vec.iter())
-            .map(|(p, x)| p.bit_proof.f_j.iter().map(|f| x - f).collect())
+            .map(|(p, x)| SetCoefficientIterator::from_f1_j_and_x(&p.bit_proof.f1_j, &x))
             .collect();
-
-        // Using batch verification strategy from: https://eprint.iacr.org/2019/373.pdf
-        let mut set_size: usize = 0;
+        let O = offsets
+            .iter()
+            .zip(coeff_iters.clone().iter_mut())
+            .filter_map(|(O, coeff_iter)| {
+                if let Some(O) = O {
+                    Some((O, coeff_iter))
+                } else {
+                    None
+                }
+            })
+            .map(|(&O, coeff_iter)| O * coeff_iter.sum::<Scalar>())
+            .sum::<RistrettoPoint>();
         let C = self
             .clone()
-            .enumerate()
-            .map(|(i, &C_i)| {
+            .map(|C_i| {
                 set_size += 1;
-                C_i * proofs
-                    .iter()
-                    .zip(f0_j_vec.iter())
-                    .map(|(p, f0_j)| {
-                        f0_j.iter()
-                            .zip(p.bit_proof.f_j.iter())
-                            .enumerate()
-                            .map(|(j, (f0, f1))| if bit(gray_code(i), j) == 0 { f0 } else { f1 })
-                            .product::<Scalar>()
-                    })
+                C_i * coeff_iters
+                    .iter_mut()
+                    .filter_map(|coeff_iter| coeff_iter.next())
                     .sum::<Scalar>()
             })
             .sum::<RistrettoPoint>();
@@ -621,28 +624,6 @@ where
             .iter()
             .zip(x_vec.iter())
             .map(|(p, &x)| p.G_k.eval(x).unwrap())
-            .sum::<RistrettoPoint>();
-        let O = offsets
-            .iter()
-            .zip(proofs.iter().zip(f0_j_vec.iter()))
-            .filter_map(|(O, (p, f0_j))| {
-                if let Some(O) = O {
-                    Some((O, (p, f0_j)))
-                } else {
-                    None
-                }
-            })
-            .map(|(&O, (p, f0_j))| {
-                O * (0..gens.max_set_size())
-                    .map(|i| {
-                        f0_j.iter()
-                            .zip(p.bit_proof.f_j.iter())
-                            .enumerate()
-                            .map(|(j, (&f0, &f1))| if bit(gray_code(i), j) == 0 { f0 } else { f1 })
-                            .product::<Scalar>()
-                    })
-                    .sum::<Scalar>()
-            })
             .sum::<RistrettoPoint>();
         if C.is_identity() || E.is_identity() || G.is_identity() {
             return Err(ProofError::VerificationFailed);
@@ -673,6 +654,72 @@ where
             c += v * gens.H[i];
         }
         Ok(c)
+    }
+}
+
+// Iterate over each coefficient according to optimized Gray code permutations of each previous
+// coefficient.
+#[derive(Clone)]
+struct SetCoefficientIterator {
+    f0_j: Vec<Scalar>,
+    f0_inv_j: Vec<Scalar>,
+    f1_j: Vec<Scalar>,
+    f1_inv_j: Vec<Scalar>,
+    n: usize,
+    max_n: usize,
+    nth_code: usize,
+    nth_coeff: Scalar,
+}
+
+impl SetCoefficientIterator {
+    fn from_f1_j_and_x(f1_j: &Vec<Scalar>, x: &Scalar) -> SetCoefficientIterator {
+        let f1_j = f1_j.clone();
+        let mut f1_inv_j = f1_j.clone();
+        Scalar::batch_invert(&mut f1_inv_j[..]);
+        let f0_j: Vec<Scalar> = f1_j.iter().map(|f1| x - f1).collect();
+        let mut f0_inv_j = f0_j.clone();
+        Scalar::batch_invert(&mut f0_inv_j[..]);
+        let n = 0;
+        let max_n = 2usize.checked_pow(f1_j.len() as u32).unwrap();
+        let nth_code = gray_code(n);
+        let nth_coeff = f0_j.iter().product();
+        SetCoefficientIterator {
+            f0_j,
+            f0_inv_j,
+            f1_j,
+            f1_inv_j,
+            n,
+            max_n,
+            nth_code,
+            nth_coeff,
+        }
+    }
+}
+
+impl Iterator for SetCoefficientIterator {
+    type Item = Scalar;
+
+    #[inline]
+    fn next(&mut self) -> Option<Scalar> {
+        if self.n < self.max_n {
+            let next_coeff = self.nth_coeff;
+            self.n += 1;
+            if self.n < self.max_n {
+                let next_code = gray_code(self.n);
+                let j = (self.nth_code ^ next_code).trailing_zeros() as usize;
+                if self.nth_code > next_code {
+                    self.nth_coeff *= self.f1_inv_j[j];
+                    self.nth_coeff *= self.f0_j[j];
+                } else {
+                    self.nth_coeff *= self.f0_inv_j[j];
+                    self.nth_coeff *= self.f1_j[j];
+                }
+                self.nth_code = next_code;
+            }
+            Some(next_coeff)
+        } else {
+            None
+        }
     }
 }
 
