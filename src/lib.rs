@@ -153,6 +153,7 @@
 //! # References
 //! * [One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin](https://eprint.iacr.org/2014/764)
 //! * [Short Accountable Ring Signatures Based on DDH](https://eprint.iacr.org/2015/643)
+//! * [Lelandus: Towards Confidentiality and Anonymity of Blockchain Transactions From Standard Assumptions](https://eprint.iacr.org/2019/373)
 
 #![no_std]
 #![feature(test)]
