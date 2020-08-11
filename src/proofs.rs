@@ -192,10 +192,10 @@ impl ProofGens {
             .commit(&self, &r_C)?;
         let D = a_j_i.iter().flatten().map(|a| -a * a).commit(&self, &r_D)?;
 
-        transcript.append_point(b"A", &A.compress());
-        transcript.append_point(b"B", &B.compress());
-        transcript.append_point(b"C", &C.compress());
-        transcript.append_point(b"D", &D.compress());
+        transcript.validate_and_append_point(b"A", &A.compress())?;
+        transcript.validate_and_append_point(b"B", &B.compress())?;
+        transcript.validate_and_append_point(b"C", &C.compress())?;
+        transcript.validate_and_append_point(b"D", &D.compress())?;
 
         let x = transcript.challenge_scalar(b"bit-proof-challenge");
 
@@ -253,10 +253,10 @@ impl ProofGens {
     ) -> ProofResult<Scalar> {
         transcript.bit_proof_domain_sep(self.n_bits as u64);
 
-        transcript.append_point(b"A", &proof.A.compress());
-        transcript.append_point(b"B", &B.compress());
-        transcript.append_point(b"C", &proof.C.compress());
-        transcript.append_point(b"D", &proof.D.compress());
+        transcript.validate_and_append_point(b"A", &proof.A.compress())?;
+        transcript.validate_and_append_point(b"B", &B.compress())?;
+        transcript.validate_and_append_point(b"C", &proof.C.compress())?;
+        transcript.validate_and_append_point(b"D", &proof.D.compress())?;
 
         let x = transcript.challenge_scalar(b"bit-proof-challenge");
 
@@ -269,20 +269,6 @@ impl ProofGens {
         // Verify proof size
         if proof.f_j.len() != self.n_bits {
             return Err(ProofError::InvalidProofSize);
-        }
-
-        // Verify no points are the identity point
-        if proof.A.is_identity() {
-            return Err(ProofError::PointIsIdentity);
-        }
-        if B.is_identity() {
-            return Err(ProofError::PointIsIdentity);
-        }
-        if proof.C.is_identity() {
-            return Err(ProofError::PointIsIdentity);
-        }
-        if proof.D.is_identity() {
-            return Err(ProofError::PointIsIdentity);
         }
 
         // Verify all scalars are canonical
@@ -558,7 +544,7 @@ where
             return Err(ProofError::SetIsTooLarge);
         }
         for k in 0..gens.n_bits - 1 {
-            transcript.append_point(b"G_k", &G_k[k].compress());
+            transcript.validate_and_append_point(b"G_k", &G_k[k].compress())?;
         }
 
         let (B, bit_proof, x) = gens.commit_bits(&mut transcript.clone(), l, &a_j_i[0])?;
@@ -584,14 +570,6 @@ where
     ) -> ProofResult<()> {
         transcript.one_of_many_proof_domain_sep(gens.n_bits as u64);
 
-        for Off in offsets {
-            if let Some(O) = Off {
-                if O.is_identity() {
-                    return Err(ProofError::PointIsIdentity);
-                }
-            }
-        }
-
         let mut x_vec = Vec::new();
         for p in proofs {
             if !p.z.is_canonical() {
@@ -600,10 +578,7 @@ where
 
             let mut t = transcript.clone();
             for k in 0..gens.n_bits - 1 {
-                if p.G_k[k].is_identity() {
-                    return Err(ProofError::PointIsIdentity);
-                }
-                t.append_point(b"G_k", &p.G_k[k].compress());
+                t.validate_and_append_point(b"G_k", &p.G_k[k].compress())?;
             }
             x_vec.push(gens.verify_bits(&mut t, &p.B, &p.bit_proof)?);
         }
