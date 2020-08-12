@@ -572,6 +572,11 @@ where
     ) -> ProofResult<()> {
         transcript.one_of_many_proof_domain_sep(gens.n_bits as u64);
 
+        // Every proof must have an entry in `offsets`, even if it is `None`.
+        if proofs.len() != offsets.len() {
+            return Err(ProofError::VerificationFailed);
+        }
+
         let mut x_vec = Vec::new();
         for p in proofs {
             if !p.z.is_canonical() {
