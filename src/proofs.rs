@@ -70,8 +70,7 @@ impl ProofGens {
         if n_bits <= 1 {
             return Err(ProofError::SetIsTooSmall);
         }
-
-        if 2usize.checked_pow(n_bits as u32).is_none() {
+        if n_bits > 32 {
             return Err(ProofError::SetIsTooLarge);
         };
 
@@ -787,6 +786,8 @@ mod tests {
         assert!(ProofGens::new(5).is_ok());
         assert_eq!(ProofGens::new(0).unwrap_err(), ProofError::SetIsTooSmall);
         assert_eq!(ProofGens::new(1).unwrap_err(), ProofError::SetIsTooSmall);
+        assert!(ProofGens::new(32).is_ok());
+        assert_eq!(ProofGens::new(33).unwrap_err(), ProofError::SetIsTooLarge);
         assert_eq!(
             ProofGens::new(0xffffffff).unwrap_err(),
             ProofError::SetIsTooLarge
@@ -819,8 +820,7 @@ mod tests {
         assert_eq!(gens.max_set_size(), 2147483648);
         let gens = ProofGens::new(32).unwrap();
         assert_eq!(gens.max_set_size(), 4294967296);
-        let gens = ProofGens::new(33).unwrap();
-        assert_eq!(gens.max_set_size(), 8589934592);
+        assert!(ProofGens::new(33).is_err());
     }
 
     #[test]
