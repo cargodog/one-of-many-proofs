@@ -3,6 +3,9 @@ name = "one-of-many-proofs"
 version = "0.1.0"
 authors = ["cargodog <cargodog@protonmail.com>"]
 edition = "2018"
+description = "Implementation of one-of-many zero-knowledge membership proofs."
+license-file = "LICENSE"
+repository = "https://github.com/cargodog/one-of-many-proofs"
 
 [dependencies]
 rand = "0.7"
