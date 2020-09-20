@@ -20,6 +20,8 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::vec::Vec;
 
+static mut ENABLE_GRAY_CODE: bool = false;
+
 /// A collection of generator points that can be used to compute various proofs
 /// in this module. To create an instance of [`ProofGens`] it is recommended to
 /// call ProofGens::new(`n`), where `n` is the number of bits to be used in
@@ -532,7 +534,7 @@ where
         self.clone()
             .map(|&C_i| if let Some(O) = offset { C_i - O } else { C_i })
             .for_each(|C_i| {
-                let p_i = compute_p_i(gray_code(i), gray_code(l), &a_j_i);
+                let p_i = compute_p_i(encode_idx(i), encode_idx(l), &a_j_i);
                 p_i.iter().enumerate().for_each(|(k, p)| {
                     G_k[k] += p * C_i;
                 });
@@ -548,7 +550,7 @@ where
         }
 
         let (B, bit_proof, x) =
-            gens.commit_bits(&mut transcript.clone(), gray_code(l), &a_j_i[0])?;
+            gens.commit_bits(&mut transcript.clone(), encode_idx(l), &a_j_i[0])?;
 
         let z = r * scalar_exp(x, gens.n_bits) - Polynomial::from(rho_k).eval(x).unwrap();
 
@@ -685,7 +687,7 @@ impl SetCoefficientIterator {
         Scalar::batch_invert(&mut f0_inv_j[..]);
         let n = 0;
         let max_n = 2usize.checked_pow(f1_j.len() as u32).unwrap();
-        let nth_code = gray_code(n);
+        let nth_code = encode_idx(n);
         let nth_coeff = f0_j.iter().product();
         SetCoefficientIterator {
             f0_j,
@@ -708,21 +710,50 @@ impl Iterator for SetCoefficientIterator {
         if self.n < self.max_n {
             let next_coeff = self.nth_coeff;
             self.n += 1;
-            if self.n < self.max_n {
-                let next_code = gray_code(self.n);
-                let j = (self.nth_code ^ next_code).trailing_zeros() as usize;
-                if self.nth_code > next_code {
-                    self.nth_coeff *= self.f1_inv_j[j];
-                    self.nth_coeff *= self.f0_j[j];
+            // HACK -- This iterator has been modified to optionally iterate over Gray coded
+            // indices or the standard binary sequence of integers.
+            unsafe {
+                if ENABLE_GRAY_CODE {
+                    if self.n < self.max_n {
+                        let next_code = gray_code(self.n);
+                        let j = (self.nth_code ^ next_code).trailing_zeros() as usize;
+                        if self.nth_code > next_code {
+                            self.nth_coeff *= self.f1_inv_j[j];
+                            self.nth_coeff *= self.f0_j[j];
+                        } else {
+                            self.nth_coeff *= self.f0_inv_j[j];
+                            self.nth_coeff *= self.f1_j[j];
+                        }
+                        self.nth_code = next_code;
+                    }
                 } else {
-                    self.nth_coeff *= self.f0_inv_j[j];
-                    self.nth_coeff *= self.f1_j[j];
+                    self.nth_coeff = self.f0_j.iter().zip(self.f1_j.iter())
+                        .enumerate()
+                        .map(|(j, (f0, f1))| if 1 == bit(self.n, j) { f1 } else { f0 })
+                        .product::<Scalar>();
                 }
-                self.nth_code = next_code;
             }
             Some(next_coeff)
         } else {
             None
+        }
+    }
+}
+
+pub fn set_enable_gray_code(b: bool) {
+    unsafe {
+        ENABLE_GRAY_CODE = b;
+    }
+}
+
+fn encode_idx(l: usize) -> usize {
+    unsafe {
+        if ENABLE_GRAY_CODE {
+            // Convert to gray encoding
+            gray_code(l)
+        } else {
+            // Do not encode
+            l
         }
     }
 }
