@@ -680,11 +680,19 @@ struct SetCoefficientIterator {
 impl SetCoefficientIterator {
     fn from_f1_j_and_x(f1_j: &Vec<Scalar>, x: &Scalar) -> SetCoefficientIterator {
         let f1_j = f1_j.clone();
-        let mut f1_inv_j = f1_j.clone();
-        Scalar::batch_invert(&mut f1_inv_j[..]);
         let f0_j: Vec<Scalar> = f1_j.iter().map(|f1| x - f1).collect();
-        let mut f0_inv_j = f0_j.clone();
-        Scalar::batch_invert(&mut f0_inv_j[..]);
+        let mut f1_inv_j = Vec::new();
+        let mut f0_inv_j = Vec::new();
+        // HACK -- We only need to compute the f tensor inversions if we intend to use them in
+        // iterative Gray code computation. Otherwise we should not perform this computation.
+        unsafe {
+            if ENABLE_GRAY_CODE {
+                f1_inv_j = f1_j.clone();
+                Scalar::batch_invert(&mut f1_inv_j[..]);
+                f0_inv_j = f0_j.clone();
+                Scalar::batch_invert(&mut f0_inv_j[..]);
+            }
+        }
         let n = 0;
         let max_n = 2usize.checked_pow(f1_j.len() as u32).unwrap();
         let nth_code = encode_idx(n);
