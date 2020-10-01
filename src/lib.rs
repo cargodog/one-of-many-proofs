@@ -161,9 +161,9 @@
 //-----------------------------------------------------------------------------
 // External dependencies:
 //-----------------------------------------------------------------------------
+extern crate blake2;
 extern crate curve25519_dalek;
 extern crate polynomials;
-extern crate sha3;
 
 #[cfg(not(feature = "std"))]
 #[macro_use]

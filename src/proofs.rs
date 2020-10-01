@@ -2,6 +2,7 @@
 use crate::errors::{ProofError, ProofResult};
 use crate::gray_code::gray_code;
 use crate::transcript::TranscriptProtocol;
+use blake2::Blake2b;
 use core::iter::{self, Iterator};
 use core::ops::Mul;
 use core::slice;
@@ -12,7 +13,6 @@ use curve25519_dalek::traits::IsIdentity;
 use merlin::Transcript;
 use polynomials::Polynomial;
 use serde::{Deserialize, Serialize};
-use sha3::Sha3_512;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -89,11 +89,11 @@ impl ProofGens {
             G: constants::RISTRETTO_BASEPOINT_POINT,
             H: Vec::with_capacity(2 * n_bits),
         };
-        gens.H.push(RistrettoPoint::hash_from_bytes::<Sha3_512>(
+        gens.H.push(RistrettoPoint::hash_from_bytes::<Blake2b>(
             gens.G.compress().as_bytes(),
         ));
         for i in 1..(2 * n_bits) {
-            gens.H.push(RistrettoPoint::hash_from_bytes::<Sha3_512>(
+            gens.H.push(RistrettoPoint::hash_from_bytes::<Blake2b>(
                 gens.H[i - 1].compress().as_bytes(),
             ));
         }

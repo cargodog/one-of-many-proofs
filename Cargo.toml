@@ -13,12 +13,12 @@ polynomials = "0.2"
 
 [dependencies.curve25519-dalek]
 default-features = false
-version = "2"
+version = "3"
 features = ["simd_backend", "nightly", "serde", "alloc"]
 
-[dependencies.sha3]
+[dependencies.blake2]
 default-features = false
-version = "0.8"
+version = "0.9"
 
 [dependencies.merlin]
 default-features = false
